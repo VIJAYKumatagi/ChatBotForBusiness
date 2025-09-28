@@ -121,38 +121,47 @@
       return null;
     }
 
-    try {
-      const conversationHistory = getConversationHistory();
-      const systemPrompt = getSystemPrompt();
-      
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            ...conversationHistory,
-            { role: 'user', content: message }
-          ],
-          max_tokens: 500,
-          temperature: 0.7
-        })
-      });
+    const conversationHistory = getConversationHistory();
+    const systemPrompt = getSystemPrompt();
+    
+    // Try GPT-4 first, fallback to GPT-3.5-turbo
+    const models = ['gpt-4', 'gpt-3.5-turbo'];
+    
+    for (const model of models) {
+      try {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              ...conversationHistory,
+              { role: 'user', content: message }
+            ],
+            max_tokens: model === 'gpt-4' ? 800 : 500,
+            temperature: 0.7
+          })
+        });
 
-      if (!response.ok) {
-        throw new Error(`API Error: ${response.status}`);
+        if (!response.ok) {
+          if (model === 'gpt-4') continue; // Try next model
+          throw new Error(`API Error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        return data.choices[0].message.content.trim();
+      } catch (error) {
+        console.error(`AI Response Error with ${model}:`, error);
+        if (model === 'gpt-4') continue; // Try next model
+        return null;
       }
-
-      const data = await response.json();
-      return data.choices[0].message.content.trim();
-    } catch (error) {
-      console.error('AI Response Error:', error);
-      return null;
     }
+    
+    return null;
   }
 
   function getConversationHistory() {
@@ -166,16 +175,38 @@
 
   function getSystemPrompt() {
     const s = strings[currentLanguage];
-    return `You are BizAssist, a helpful business assistant chatbot. You help customers with:
+    return `You are BizAssist, an expert business assistant AI chatbot with comprehensive knowledge across all business domains. You excel at answering ANY business-related question with professional, accurate, and helpful responses.
 
-1. Business Information: Hours (${s.hours}), Location (${s.location}), Contact (${s.contact})
-2. Products/Services: We offer Basic, Premium, and Enterprise packages
-3. Support: Create tickets, track orders, provide assistance
-4. Lead Generation: Collect contact info, qualify leads, schedule demos
-5. General Business Questions: Be helpful and professional
+## Your Expertise Areas:
+- **Business Operations**: Strategy, management, processes, efficiency
+- **Marketing & Sales**: Digital marketing, lead generation, customer acquisition, branding
+- **Finance & Accounting**: Budgeting, financial planning, investment, cash flow, taxes
+- **Human Resources**: Recruitment, employee management, training, policies
+- **Technology & IT**: Software, systems, digital transformation, cybersecurity
+- **Legal & Compliance**: Business law, regulations, contracts, intellectual property
+- **Customer Service**: Support strategies, satisfaction, retention, experience
+- **E-commerce**: Online selling, platforms, payment processing, logistics
+- **Startups & Entrepreneurship**: Business planning, funding, growth strategies
+- **Industry Analysis**: Market trends, competitive analysis, opportunities
+
+## Your Business Information:
+- Hours: ${s.hours}
+- Location: ${s.location}  
+- Contact: ${s.contact}
+- Services: Basic, Premium, and Enterprise packages
+- Specialties: Business consulting, digital solutions, growth strategies
+
+## Response Guidelines:
+- Provide detailed, actionable advice for business questions
+- Use specific examples and best practices when relevant
+- Offer multiple perspectives or options when appropriate
+- Include relevant metrics, frameworks, or methodologies
+- Be conversational yet professional
+- Ask clarifying questions if needed
+- Always maintain a helpful, solution-oriented tone
 
 Current language: ${currentLanguage === 'en' ? 'English' : 'Spanish'}
-Keep responses concise, helpful, and business-focused. If you can't help, suggest contacting support.`;
+You can handle ANY business question - from basic concepts to complex strategic decisions.`;
   }
 
   function showAIThinking() {
@@ -292,6 +323,8 @@ Keep responses concise, helpful, and business-focused. If you can't help, sugges
 
   function routeFreeform(message) {
     const msg = message.toLowerCase();
+    
+    // Specific business intents
     if (msg.includes('hours')) return handleIntent('hours');
     if (msg.includes('location')) return handleIntent('location');
     if (msg.includes('contact')) return handleIntent('contact');
@@ -304,8 +337,40 @@ Keep responses concise, helpful, and business-focused. If you can't help, sugges
     if (msg.includes('agent') || msg.includes('human')) return handleIntent('agent');
     if (msg.includes('compare') || msg.includes('standard') || msg.includes('premium')) return handleIntent('compare');
 
-    // fallback
-    addMessage({ role: 'bot', text: 'I can help with FAQs, orders, support, and more. Try the quick actions.' });
+    // Enhanced business question detection
+    const businessKeywords = [
+      'business', 'company', 'strategy', 'marketing', 'sales', 'finance', 'budget',
+      'management', 'leadership', 'team', 'employee', 'customer', 'client',
+      'revenue', 'profit', 'growth', 'startup', 'entrepreneur', 'investment',
+      'market', 'competition', 'brand', 'product', 'service', 'ecommerce',
+      'digital', 'technology', 'software', 'system', 'process', 'efficiency',
+      'legal', 'compliance', 'contract', 'agreement', 'policy', 'regulation',
+      'hr', 'recruitment', 'training', 'performance', 'culture', 'workplace'
+    ];
+
+    const isBusinessQuestion = businessKeywords.some(keyword => msg.includes(keyword));
+    
+    if (isBusinessQuestion) {
+      addMessage({ 
+        role: 'bot', 
+        text: 'That\'s a great business question! I\'d love to provide detailed insights. For the most comprehensive answer, please enable AI responses by clicking "Toggle AI" or "Set API Key" in the Quick Actions. This will give you expert-level business advice across all domains.',
+        suggestions: [
+          { label: 'Enable AI for detailed response', intent: 'toggle-ai' },
+          { label: 'Set up API Key', intent: 'set-api-key' },
+          { label: 'Browse our services instead', intent: 'browse' }
+        ]
+      });
+    } else {
+      addMessage({ 
+        role: 'bot', 
+        text: 'I can help with business questions, FAQs, orders, support, and more. For comprehensive business advice, enable AI responses. Otherwise, try the quick actions below.',
+        suggestions: [
+          { label: 'Enable AI responses', intent: 'toggle-ai' },
+          { label: 'Browse products', intent: 'browse' },
+          { label: 'Get support', intent: 'ticket' }
+        ]
+      });
+    }
   }
 
   function handleIntent(intent, meta) {
@@ -382,6 +447,46 @@ Keep responses concise, helpful, and business-focused. If you can't help, sugges
       case 'set-api-key':
         promptForAPIKey();
         updateAIStatus();
+        break;
+      case 'sample-marketing':
+        addMessage({ 
+          role: 'bot', 
+          text: 'Great question about marketing strategy! For comprehensive marketing advice including digital marketing, content strategy, social media, SEO, and customer acquisition, please enable AI responses. I can provide detailed, actionable marketing insights tailored to your business.',
+          suggestions: [
+            { label: 'Enable AI for marketing advice', intent: 'toggle-ai' },
+            { label: 'Ask about our marketing services', intent: 'pricing' }
+          ]
+        });
+        break;
+      case 'sample-finance':
+        addMessage({ 
+          role: 'bot', 
+          text: 'Financial planning is crucial for business success! With AI enabled, I can help with budgeting, cash flow management, investment strategies, financial forecasting, and funding options. Enable AI responses for expert financial guidance.',
+          suggestions: [
+            { label: 'Enable AI for financial advice', intent: 'toggle-ai' },
+            { label: 'Learn about our business packages', intent: 'compare' }
+          ]
+        });
+        break;
+      case 'sample-hr':
+        addMessage({ 
+          role: 'bot', 
+          text: 'HR best practices are essential for building great teams! AI can provide detailed guidance on recruitment, employee retention, performance management, workplace culture, training programs, and compliance. Enable AI for comprehensive HR insights.',
+          suggestions: [
+            { label: 'Enable AI for HR guidance', intent: 'toggle-ai' },
+            { label: 'Schedule a consultation', intent: 'schedule' }
+          ]
+        });
+        break;
+      case 'sample-startup':
+        addMessage({ 
+          role: 'bot', 
+          text: 'Startup guidance is one of my specialties! With AI enabled, I can help with business planning, funding strategies, market validation, product development, scaling, and growth tactics. Perfect for entrepreneurs and new businesses.',
+          suggestions: [
+            { label: 'Enable AI for startup advice', intent: 'toggle-ai' },
+            { label: 'Book a startup consultation', intent: 'schedule' }
+          ]
+        });
         break;
       default:
         addMessage({ role: 'bot', text: 'I\'m not sure yet, but I\'m learning every day.' });
