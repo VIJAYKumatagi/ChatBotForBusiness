@@ -1,0 +1,263 @@
+:root {
+  --bg: #0f172a;
+  --panel: #111827;
+  --panel-2: #0b1220;
+  --text: #e5e7eb;
+  --muted: #94a3b8;
+  --brand: #22d3ee;
+  --brand-2: #60a5fa;
+  --danger: #ef4444;
+  --success: #22c55e;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica Neue, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  background: linear-gradient(180deg, var(--panel-2), var(--bg));
+  color: var(--text);
+}
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  backdrop-filter: blur(8px);
+  background: rgba(15, 23, 42, 0.7);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+}
+
+.brand .logo {
+  font-size: 24px;
+}
+
+.brand h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.container {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 20px;
+  max-width: 1100px;
+  margin: 20px auto;
+  padding: 0 16px;
+}
+
+@media (max-width: 960px) {
+  .container {
+    grid-template-columns: 1fr;
+  }
+}
+
+.chat-widget {
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, rgba(17,24,39,0.9), rgba(11,18,32,0.9));
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  min-height: 70vh;
+}
+
+.chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.bot-id {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.2), rgba(96, 165, 250, 0.2));
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.bot-name {
+  font-weight: 600;
+}
+
+.bot-status {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.chat-actions .btn.secondary {
+  background: transparent;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  color: var(--muted);
+}
+
+.chat-timeline {
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.msg {
+  display: flex;
+  gap: 10px;
+}
+
+.msg .bubble {
+  max-width: 80%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  line-height: 1.4;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.msg.bot .bubble {
+  background: rgba(34, 211, 238, 0.08);
+}
+
+.msg.user {
+  justify-content: flex-end;
+}
+
+.msg.user .bubble {
+  background: rgba(96, 165, 250, 0.12);
+}
+
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.chip {
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--text);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 999px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.chip:hover {
+  background: rgba(148, 163, 184, 0.2);
+}
+
+.chat-input {
+  display: flex;
+  gap: 10px;
+  padding: 12px;
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.chat-input input {
+  flex: 1;
+  background: rgba(2, 6, 23, 0.6);
+  color: var(--text);
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.btn {
+  border: none;
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.btn.primary {
+  background: linear-gradient(135deg, var(--brand), var(--brand-2));
+  color: #001018;
+  font-weight: 600;
+}
+
+.quick-actions {
+  background: linear-gradient(180deg, rgba(17,24,39,0.9), rgba(11,18,32,0.9));
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 16px;
+  padding: 14px;
+  height: fit-content;
+}
+
+.quick-actions h2 {
+  margin: 4px 0 12px 0;
+  font-size: 16px;
+}
+
+.qa-group + .qa-group {
+  margin-top: 12px;
+}
+
+.qa-title {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.qa-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.app-footer {
+  text-align: center;
+  color: var(--muted);
+  padding: 24px 0 40px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+}
+
+.option-card {
+  background: rgba(148, 163, 184, 0.06);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.kbd {
+  background: rgba(148, 163, 184, 0.12);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-bottom-width: 3px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 12px;
+}
+
+
