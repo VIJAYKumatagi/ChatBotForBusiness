@@ -9,7 +9,9 @@
     conversation: 'bizassist_conversation',
     profile: 'bizassist_profile',
     language: 'bizassist_language',
-    analytics: 'bizassist_analytics'
+    analytics: 'bizassist_analytics',
+    aiEnabled: 'bizassist_ai_enabled',
+    apiKey: 'bizassist_api_key'
   };
 
   const Language = {
@@ -18,6 +20,8 @@
   };
 
   let currentLanguage = localStorage.getItem(STORAGE_KEYS.language) || Language.EN;
+  let aiEnabled = localStorage.getItem(STORAGE_KEYS.aiEnabled) === 'true';
+  let apiKey = localStorage.getItem(STORAGE_KEYS.apiKey) || '';
 
   const strings = {
     [Language.EN]: {
@@ -46,7 +50,12 @@
       scheduled: (slot) => `Demo booked for ${slot}. You\'ll receive a reminder.`,
       comparePlans: 'Standard vs Premium: Premium adds priority support and advanced features.',
       personalize: (name) => `Welcome back, ${name}! Continue where we left off?`,
-      langSwitched: (lang) => `Language switched to ${lang === 'en' ? 'English' : 'Español'}.`
+      langSwitched: (lang) => `Language switched to ${lang === 'en' ? 'English' : 'Español'}.`,
+      aiThinking: '🤖 AI is thinking...',
+      aiError: 'AI response failed. Using fallback response.',
+      aiSetup: 'AI features require an API key. Please enter your OpenAI API key.',
+      aiEnabled: 'AI responses enabled!',
+      aiDisabled: 'AI responses disabled. Using rule-based responses.'
     },
     [Language.ES]: {
       welcome: '¡Hola! ¿En qué puedo ayudarte hoy?',
@@ -74,7 +83,12 @@
       scheduled: (slot) => `Demo reservada a las ${slot}. Recibirás un recordatorio.`,
       comparePlans: 'Estándar vs Premium: Premium incluye soporte prioritario y funciones avanzadas.',
       personalize: (name) => `¡Bienvenido de nuevo, ${name}! ¿Continuamos donde quedamos?`,
-      langSwitched: (lang) => `Idioma cambiado a ${lang === 'en' ? 'English' : 'Español'}.`
+      langSwitched: (lang) => `Idioma cambiado a ${lang === 'en' ? 'English' : 'Español'}.`,
+      aiThinking: '🤖 IA está pensando...',
+      aiError: 'Respuesta de IA falló. Usando respuesta de respaldo.',
+      aiSetup: 'Las funciones de IA requieren una clave API. Por favor ingresa tu clave API de OpenAI.',
+      aiEnabled: '¡Respuestas de IA habilitadas!',
+      aiDisabled: 'Respuestas de IA deshabilitadas. Usando respuestas basadas en reglas.'
     }
   };
 
@@ -101,13 +115,100 @@
     timeline.scrollTop = timeline.scrollHeight;
   }
 
-  function addMessage({ role, text, html, suggestions }) {
+  // AI Response Functions
+  async function getAIResponse(message) {
+    if (!aiEnabled || !apiKey) {
+      return null;
+    }
+
+    try {
+      const conversationHistory = getConversationHistory();
+      const systemPrompt = getSystemPrompt();
+      
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-3.5-turbo',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            ...conversationHistory,
+            { role: 'user', content: message }
+          ],
+          max_tokens: 500,
+          temperature: 0.7
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.choices[0].message.content.trim();
+    } catch (error) {
+      console.error('AI Response Error:', error);
+      return null;
+    }
+  }
+
+  function getConversationHistory() {
+    const messages = Array.from(timeline.children).slice(-10); // Last 10 messages
+    return messages.map(msg => {
+      const role = msg.classList.contains('user') ? 'user' : 'assistant';
+      const content = msg.querySelector('.bubble').textContent;
+      return { role, content };
+    });
+  }
+
+  function getSystemPrompt() {
+    const s = strings[currentLanguage];
+    return `You are BizAssist, a helpful business assistant chatbot. You help customers with:
+
+1. Business Information: Hours (${s.hours}), Location (${s.location}), Contact (${s.contact})
+2. Products/Services: We offer Basic, Premium, and Enterprise packages
+3. Support: Create tickets, track orders, provide assistance
+4. Lead Generation: Collect contact info, qualify leads, schedule demos
+5. General Business Questions: Be helpful and professional
+
+Current language: ${currentLanguage === 'en' ? 'English' : 'Spanish'}
+Keep responses concise, helpful, and business-focused. If you can't help, suggest contacting support.`;
+  }
+
+  function showAIThinking() {
+    const thinkingMsg = addMessage({ 
+      role: 'bot', 
+      text: strings[currentLanguage].aiThinking,
+      isThinking: true 
+    });
+    return thinkingMsg;
+  }
+
+  function removeThinkingMessage() {
+    const thinkingMsgs = timeline.querySelectorAll('.msg.bot .bubble');
+    thinkingMsgs.forEach(bubble => {
+      if (bubble.textContent.includes('🤖')) {
+        bubble.closest('.msg').remove();
+      }
+    });
+  }
+
+  function addMessage({ role, text, html, suggestions, isThinking = false }) {
     const wrap = document.createElement('div');
     wrap.className = `msg ${role}`;
 
     const bubble = document.createElement('div');
     bubble.className = 'bubble';
-    if (html) bubble.innerHTML = html; else bubble.textContent = text;
+    if (isThinking) {
+      bubble.innerHTML = `<span class="thinking-dots">${text}</span>`;
+    } else if (html) {
+      bubble.innerHTML = html;
+    } else {
+      bubble.textContent = text;
+    }
 
     wrap.appendChild(bubble);
 
@@ -163,9 +264,29 @@
     });
   }
 
-  function handleUserInput(message) {
+  async function handleUserInput(message) {
     if (!message.trim()) return;
     addMessage({ role: 'user', text: message.trim() });
+    
+    // Try AI response first if enabled
+    if (aiEnabled && apiKey) {
+      const thinkingMsg = showAIThinking();
+      const aiResponse = await getAIResponse(message.trim());
+      
+      // Remove thinking message
+      thinkingMsg.remove();
+      
+      if (aiResponse) {
+        addMessage({ role: 'bot', text: aiResponse });
+        trackAnalytics('ai_response');
+        return;
+      } else {
+        addMessage({ role: 'bot', text: strings[currentLanguage].aiError });
+        trackAnalytics('ai_error');
+      }
+    }
+    
+    // Fallback to rule-based responses
     routeFreeform(message.trim());
   }
 
@@ -253,6 +374,14 @@
         break;
       case 'lang-es':
         switchLanguage(Language.ES);
+        break;
+      case 'toggle-ai':
+        toggleAI();
+        updateAIStatus();
+        break;
+      case 'set-api-key':
+        promptForAPIKey();
+        updateAIStatus();
         break;
       default:
         addMessage({ role: 'bot', text: 'I\'m not sure yet, but I\'m learning every day.' });
@@ -352,6 +481,49 @@
     }
   }
 
+  // AI Control Functions
+  function toggleAI() {
+    aiEnabled = !aiEnabled;
+    localStorage.setItem(STORAGE_KEYS.aiEnabled, aiEnabled.toString());
+    
+    if (aiEnabled && !apiKey) {
+      promptForAPIKey();
+    } else {
+      addMessage({ 
+        role: 'bot', 
+        text: aiEnabled ? strings[currentLanguage].aiEnabled : strings[currentLanguage].aiDisabled 
+      });
+    }
+  }
+
+  function promptForAPIKey() {
+    const key = prompt(strings[currentLanguage].aiSetup);
+    if (key && key.trim()) {
+      apiKey = key.trim();
+      localStorage.setItem(STORAGE_KEYS.apiKey, apiKey);
+      addMessage({ role: 'bot', text: strings[currentLanguage].aiEnabled });
+    } else {
+      aiEnabled = false;
+      localStorage.setItem(STORAGE_KEYS.aiEnabled, 'false');
+    }
+  }
+
+  function setAPIKey(key) {
+    apiKey = key.trim();
+    localStorage.setItem(STORAGE_KEYS.apiKey, apiKey);
+    if (key) {
+      aiEnabled = true;
+      localStorage.setItem(STORAGE_KEYS.aiEnabled, 'true');
+    }
+  }
+
+  function updateAIStatus() {
+    const statusEl = document.getElementById('aiStatus');
+    if (statusEl) {
+      statusEl.textContent = aiEnabled ? 'On' : 'Off';
+    }
+  }
+
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     const value = input.value;
@@ -370,6 +542,7 @@
 
   // Init
   attachQuickActions();
+  updateAIStatus();
   restoreConversation();
   personalizeIfPossible();
 })();
